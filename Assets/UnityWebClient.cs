@@ -8,7 +8,7 @@ namespace OpenLevel
 {
     public class UnityWebClient : MonoBehaviour
     {
-        CookieContainer _cookies;
+        protected CookieContainer _cookies;
 
         public CookieContainer Cookies
         {
@@ -18,7 +18,7 @@ namespace OpenLevel
             }
         }
 
-        void Awake()
+        protected virtual void Awake()
         {
             _cookies = new CookieContainer();
         }
@@ -26,7 +26,7 @@ namespace OpenLevel
         /// <summary>
         /// Creates and sends a UnityWebReqeust configured for GET
         /// </summary>
-        void Get(string uri, Action<UnityWebRequest> handler)
+        public void Get(string uri, Action<UnityWebRequest> handler)
         {
             StartCoroutine(CPostOrGet(uri, null, handler));
         }
@@ -34,7 +34,7 @@ namespace OpenLevel
         /// <summary>
         /// Creates and sends a UnityWebReqeust configured for POST
         /// </summary>
-        void Post(string uri, IDictionary<string, string> formFields, Action<UnityWebRequest> handler)
+        public void Post(string uri, IDictionary<string, string> formFields, Action<UnityWebRequest> handler)
         {
             StartCoroutine(CPostOrGet(uri, formFields, handler));
         }
