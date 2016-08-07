@@ -57,7 +57,7 @@ namespace OpenLevel
         /// <param name="clearExisting">if true, removes all the existing cookie</param>
         public void Set(string cookieString, bool clearExisting = false)
         {
-            Clear();
+            if (clearExisting) Clear();
             if (String.IsNullOrEmpty(cookieString))
                 return;
 
