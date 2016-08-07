@@ -11,6 +11,11 @@ namespace OpenLevel.Wordpress
     {
         public string apiUri = "http://localhost/api/";
 
+        public void Auth(string username, string password, Action<Response.Auth> handler)
+        {
+
+        }
+
         public void Info(Action<UnityWebRequest> handler)
         {
             Get("info/", handler);
