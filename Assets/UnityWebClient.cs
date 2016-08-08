@@ -1,8 +1,15 @@
 ﻿using UnityEngine;
-using UnityEngine.Networking;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+
+#if UNITY_5_4_OR_NEWER
+using UnityEngine.Networking;
+#elif UNITY_5_2 || UNITY_5_3
+using UnityEngine.Experimental.Networking;
+#else
+#error It requires Unity 5.2.0 or higher.
+#endif
 
 namespace OpenLevel
 {
@@ -28,7 +35,6 @@ namespace OpenLevel
             if (_cookies.Contains(www.url))
             {
                 www.SetRequestHeader("cookie", _cookies[www.url].ToString());
-                Debug.Log(_cookies[www.url].ToString());
             }
 
             yield return www.Send();
@@ -76,6 +82,24 @@ namespace OpenLevel
         /// <summary>
         /// Creates and sends a UnityWebReqeust configured for POST
         /// </summary>
+        public void Post(string uri, byte[] postData, Action<UnityWebRequest> handler)
+        {
+            UnityWebRequest www;
+
+            if (postData == null || postData.Length == 0)
+                www = UnityWebRequest.Get(uri);
+            else
+            {
+                www = UnityWebRequest.Put(uri, postData); // HACK
+                www.method = UnityWebRequest.kHttpVerbPOST;
+            }
+
+            StartCoroutine(CRequest(www, handler));
+        }
+
+        /// <summary>
+        /// Creates and sends a UnityWebReqeust configured for POST
+        /// </summary>
         public void Post(string uri, string postData, Action<UnityWebRequest> handler)
         {
             UnityWebRequest www;
@@ -83,7 +107,10 @@ namespace OpenLevel
             if (postData == null || String.IsNullOrEmpty(postData))
                 www = UnityWebRequest.Get(uri);
             else
-                www = UnityWebRequest.Post(uri, postData);
+            {
+                www = UnityWebRequest.Put(uri, postData); // HACK
+                www.method = UnityWebRequest.kHttpVerbPOST;
+            }
 
             StartCoroutine(CRequest(www, handler));
         }

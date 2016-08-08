@@ -3,18 +3,25 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+
+#if UNITY_5_4_OR_NEWER
 using UnityEngine.Networking;
+#elif UNITY_5_2 || UNITY_5_3
+using UnityEngine.Experimental.Networking;
+#else
+#error It requires Unity 5.2.0 or higher.
+#endif
 
 namespace OpenLevel.Wordpress
 {
-    public class WpJsonClient : UnityWebClient, IWordpressClient
+    public class WpJsonClient : UnityWebClient
     {
         public string apiUri = "http://localhost/api/";
 
-        public void Auth(string username, string password, Action<Response.Auth> handler)
-        {
+        //public void Auth(string username, string password, Action<Response.Auth> handler)
+        //{
 
-        }
+        //}
 
         public void Info(Action<UnityWebRequest> handler)
         {

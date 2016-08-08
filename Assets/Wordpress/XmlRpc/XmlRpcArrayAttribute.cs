@@ -6,21 +6,13 @@ using System.Reflection;
 namespace OpenLevel.Wordpress.XmlRpc
 {
     [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
-    public sealed class XmlRpcStructAttribute : Attribute
+    public sealed class XmlRpcArrayAttribute : Attribute
     {
         Type _type;
         BindingFlags _flags;
         bool _implicitMember;
 
-        public BindingFlags Flags
-        {
-            get
-            {
-                return _flags;
-            }
-        }
-
-        public XmlRpcStructAttribute(Type type,
+        public XmlRpcArrayAttribute(Type type,
             BindingFlags bindingFlags = BindingFlags.Public | BindingFlags.Instance,
             bool implicitMember = true)
         {
@@ -38,9 +30,9 @@ namespace OpenLevel.Wordpress.XmlRpc
             {
                 var member = GetCustomAttribute(fields[i], typeof(XmlRpcMemberAttribute)) as XmlRpcMemberAttribute;
 
-                if(member != null)
+                if (member != null)
                     list[i] = new KeyValuePair<string, object>(member.Name, fields[i].GetValue(@struct));
-                else if(_implicitMember)
+                else if (_implicitMember)
                     list[i] = new KeyValuePair<string, object>(fields[i].Name, fields[i].GetValue(@struct));
             }
 

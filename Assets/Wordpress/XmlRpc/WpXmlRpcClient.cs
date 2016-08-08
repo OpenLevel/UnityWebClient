@@ -1,110 +1,574 @@
-﻿using LitJson;
-using System;
-using System.Collections;
+﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
-using UnityEngine;
-using UnityEngine.Networking;
-
-namespace OpenLevel.Wordpress.XmlRpc.Request
-{
-    
-}
+using System.Security.Authentication;
+using System.Xml;
 
 namespace OpenLevel.Wordpress.XmlRpc
 {
-    public class WpXmlRpcClient : UnityWebClient, IWpXmlRpc
+    using KeyValue = KeyValuePair<string, object>;
+
+    public class WpXmlRpcClient : UnityWebClient
     {
         public string xmlRpcUri = "http://localhost/xmlrpc.php";
-        string _username;
-        string _password;
+        protected string _username;
+        protected string _password;
 
-        string buildXMLRPCRequest(IEnumerable<KeyValuePair<string, object>> FieldArray, string MethodName)
+        public bool IsAuthed
         {
-            StringBuilder builder = new StringBuilder();
-
-            // 당장은 String.Format해도 되지만 나중에 추가할 게 더 있으니 StringBuilder로 작업
-            builder.AppendFormat(
-@"<?xml version=""1.0"" encoding=""iso-8859-1""?>
-<methodCall>
-<methodName>{0}</methodName>
-<params>
-{1}
-</params>
-</methodCall>",
-                                MethodName,
-                                buildNode(FieldArray));
-
-            return builder.ToString();
+            get;
+            protected set;
         }
 
-        string buildNode(IEnumerable<KeyValuePair<string, object>> FieldArray, bool isStruct = false)
+        public int BlogId
         {
-            string ReturnList = "";
+            get;
+            set;
+        }
 
-            foreach (var Item in FieldArray)
+        #region protected Methods
+
+        #region Posts
+        protected void XmlRpcPost(string xmlString, Action<XmlNode> onSuccess, Action<Models.Fault> onFailure)
+        {
+            Post(xmlRpcUri, xmlString, www =>
             {
-                if (Item.Value == null && isStruct)
-                    continue;
+                XmlDocument xml = new XmlDocument();
+                xml.LoadXml(www.downloadHandler.text);
 
-                string TypeName = "int";
-                Type myType = Item.Value.GetType();
-                string fieldValue = "";
+                var faultNode = xml.SelectSingleNode("methodResponse/fault");
 
-                var structAttribute = Attribute.GetCustomAttribute(myType, typeof(XmlRpcStructAttribute)) as XmlRpcStructAttribute;
-
-                if (structAttribute != null)
+                if (faultNode == null)
                 {
-                    fieldValue = buildNode(structAttribute.ToCollection(Item.Value), true);
-                    TypeName = "struct";
+                    var paramNode = xml.SelectSingleNode("methodResponse/params/param");
+
+                    if (onSuccess != null)
+                    {
+                        if (paramNode != null)
+                            onSuccess(paramNode);
+                        else
+                            onFailure(new Models.Fault(2, "params/param node is null."));
+                    }
+                    else
+                    {
+                        onFailure(new Models.Fault(1, "onSuccess handler is null."));
+                    }
                 }
-                else if (myType == typeof(string))
+                else if (onFailure != null)
                 {
-                    TypeName = "string";
-                    fieldValue = Item.Value.ToString();
+                    onFailure(XmlRpcReader.ReadStruct<Models.Fault>(faultNode));
                 }
-                else if (myType == typeof(int) || myType == typeof(int?))
-                {
-                    fieldValue = Item.Value.ToString();
-                    TypeName = "int";
-                }
-
-                string ThisNode;
-
-                if(isStruct)
-                    ThisNode = String.Format("<member><name>{2}</name><value><{0}>{1}</{0}></value></member>", TypeName, fieldValue, Item.Key);
-                else
-                    ThisNode = String.Format("<value><{0}>{1}</{0}></value>", TypeName, fieldValue);
-                ///var ThisNode = "\n<" + NodeType + " type=\"" + TypeName + "\" id=\"" + Item.Key + "\">" + fieldValue + "</" + NodeType + ">";
-                ReturnList += ThisNode;
-            }
-
-            return ReturnList;
-        }
-
-        public void Auth(string username, string password, Action<Response.Auth> handler)
-        {
-            _username = username;
-            _password = password;
-        }
-        
-        public void NewPost(int blog_id, string username, string password, Request.Content content)
-        {
-            var data = new List<KeyValuePair<string, object>>();
-
-            // The order of items is IMPORTANT.
-            data.Add(new KeyValuePair<string, object>("blog_id", blog_id));
-            data.Add(new KeyValuePair<string, object>("username", username));
-            data.Add(new KeyValuePair<string, object>("password", password));
-            data.Add(new KeyValuePair<string, object>("content", content));
-
-            Debug.Log(buildXMLRPCRequest(data, "wp.newPost"));
-
-            Post(xmlRpcUri, buildXMLRPCRequest(data, "wp.newPost"), www =>
-            {
-                Debug.Log(www.downloadHandler.text);
             });
         }
+
+        protected void GetPost(int blogId,
+                            string username,
+                            string password,
+                            int postId,
+                            Action<Models.Post> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("post_id", postId));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getPost", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStruct<Models.Post>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetPosts(int blogId,
+                            string username,
+                            string password,
+                            int postId,
+                            Models.GetPostsFilter filter,
+                            Action<Models.Post[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("post_id", postId));
+            data.Add(new KeyValue("filter", filter));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getPosts", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStructArray<Models.Post>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetPosts(int blogId,
+                            string username,
+                            string password,
+                            int postId,
+                            Action<Models.Post[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            GetPosts(blogId, username, password, postId, null, onSuccess, onFailure);
+        }
+
+        protected void NewPost(int blogId,
+                            string username,
+                            string password,
+                            Models.PostContent content,
+                            Action<string> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("content", content));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.newPost", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node).ToString());
+                },
+                onFailure);
+        }
+
+        protected void EditPost(int blogId,
+                            string username,
+                            string password,
+                            int postId,
+                            Models.PostContent content,
+                            Action<bool> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("post_id", postId));
+            data.Add(new KeyValue("content", content));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.editPost", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node) as bool? ?? false);
+                },
+                onFailure);
+        }
+
+        protected void DeletePost(int blogId,
+                            string username,
+                            string password,
+                            int postId,
+                            Action<bool> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("post_id", postId));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.deletePost", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node) as bool? ?? false);
+                },
+                onFailure);
+        }
+
+        protected void GetPostType(int blogId,
+                            string username,
+                            string password,
+                            string postTypeName,
+                            Action<Models.PostType> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("post_type_name", postTypeName));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getPostType", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStruct<Models.PostType>(node));
+                },
+                onFailure);
+        }
+
+        // TODO : FILTER
+        protected void GetPostTypes(int blogId,
+                            string username,
+                            string password,
+                            Action<Models.PostType[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getPostTypes", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStructArray<Models.PostType>(node));
+                },
+                onFailure);
+        }
+        #endregion Posts
+
+        #region Taxonomies
+        protected void GetTaxonomy(int blogId,
+                            string username,
+                            string password,
+                            string taxonomy,
+                            Action<Models.Taxonomy> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("taxonomy", taxonomy));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getTaxonomy", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStruct<Models.Taxonomy>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetTaxonomies(int blogId,
+                            string username,
+                            string password,
+                            Action<Models.Taxonomy[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getTaxonomies", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStructArray<Models.Taxonomy>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetTerm(int blogId,
+                           string username,
+                           string password,
+                           string taxonomy,
+                           int termId,
+                           Action<Models.Term> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("taxonomy", taxonomy));
+            data.Add(new KeyValue("term_id", termId));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getTerm", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStruct<Models.Term>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetTerms(int blogId,
+                           string username,
+                           string password,
+                           string taxonomy,
+                           Models.GetTermsFilter filter,
+                           Action<Models.Term[]> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("taxonomy", taxonomy));
+            data.Add(new KeyValue("filter", filter));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getTerms", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStructArray<Models.Term>(node));
+                },
+                onFailure);
+        }
+
+        protected void GetTerms(int blogId,
+                           string username,
+                           string password,
+                           string taxonomy,
+                           Action<Models.Term[]> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            GetTerms(blogId, username, password, taxonomy, null, onSuccess, onFailure);
+        }
+
+        protected void NewTerm(int blogId,
+                           string username,
+                           string password,
+                           Models.TermContent content,
+                           Action<string> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("content", content));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.newTerm", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node).ToString());
+                },
+                onFailure);
+        }
+
+        protected void EditTerm(int blogId,
+                           string username,
+                           string password,
+                           int termId,
+                           Models.TermContent content,
+                           Action<bool> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("term_id", termId));
+            data.Add(new KeyValue("content", content));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.editTerm", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node) as bool? ?? false);
+                },
+                onFailure);
+        }
+
+        protected void DeleteTerm(int blogId,
+                           string username,
+                           string password,
+                           string taxonomy,
+                           int termId,
+                           Action<bool> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+
+            data.Add(new KeyValue("blog_id", blogId));
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+            data.Add(new KeyValue("taxonomy", taxonomy));
+            data.Add(new KeyValue("term_id", termId));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.deleteTerm", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadValue(node) as bool? ?? false);
+                },
+                onFailure);
+        }
+        #endregion Taxonomies
+
+        protected void GetUsersBlogs(string username, string password, Action<Models.UsersBlog[]> onSuccess, Action<Models.Fault> onFailure)
+        {
+            var data = new List<KeyValue>();
+            
+            data.Add(new KeyValue("username", username));
+            data.Add(new KeyValue("password", password));
+
+            XmlRpcPost(XmlRpcWriter.BuildRequest("wp.getUsersBlogs", data),
+                node =>
+                {
+                    onSuccess(XmlRpcReader.ReadStructArray<Models.UsersBlog>(node));
+                },
+                onFailure);
+        }
+
+        #endregion protected Methods
+
+        #region Public Methods
+        public void Auth(string username, string password, Action onSuccess, Action<Models.Fault> onFailure)
+        {
+            GetUsersBlogs(username,
+                password,
+                blog =>
+                {
+                    _username = username;
+                    _password = password;
+                    IsAuthed = true;
+                    if (onSuccess != null) onSuccess();
+                },
+                onFailure);
+        }
+
+        public void GetUsersBlogs(Action<Models.UsersBlog[]> onSuccess, Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetUsersBlogs(_username, _password, onSuccess, onFailure);
+        }
+
+        public void GetPost(int blogId,
+                            int postId,
+                            Action<Models.Post> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetPost(blogId, _username, _password, postId, onSuccess, onFailure);
+        }
+
+        public void GetPosts(int postId,
+                            Models.GetPostsFilter filter,
+                            Action<Models.Post[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetPosts(BlogId, _username, _password, postId, filter, onSuccess, onFailure);
+        }
+
+        public void GetPosts(int postId,
+                            Action<Models.Post[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetPosts(BlogId, _username, _password, postId, null, onSuccess, onFailure);
+        }
+
+        public void NewPost(Models.PostContent content,
+                            Action<string> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            NewPost(BlogId, _username, _password, content, onSuccess, onFailure);
+        }
+
+        public void EditPost(int postId,
+                            Models.PostContent content,
+                            Action<bool> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            EditPost(BlogId, _username, _password, postId, content, onSuccess, onFailure);
+        }
+
+        public void DeletePost(int postId,
+                            Action<bool> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            DeletePost(BlogId, _username, _password, postId, onSuccess, onFailure);
+        }
+
+        public void GetPostType(string postTypeName,
+                            Action<Models.PostType> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetPostType(BlogId, _username, _password, postTypeName, onSuccess, onFailure);
+        }
+
+        // TODO : FILTER
+        public void GetPostTypes(Action<Models.PostType[]> onSuccess, Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetPostTypes(BlogId, _username, _password, onSuccess, onFailure);
+        }
+
+        public void GetTaxonomy(string taxonomy,
+                            Action<Models.Taxonomy> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetTaxonomy(BlogId, _username, _password, taxonomy, onSuccess, onFailure);
+        }
+
+        public void GetTaxonomies(Action<Models.Taxonomy[]> onSuccess, Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetTaxonomies(BlogId, _username, _password, onSuccess, onFailure);
+        }
+
+        public void GetTerm(string taxonomy,
+                            int termId,
+                            Action<Models.Term> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetTerm(BlogId, _username, _password, taxonomy, termId, onSuccess, onFailure);
+        }
+
+        public void GetTerms(string taxonomy,
+                            Action<Models.Term[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetTerms(BlogId, _username, _password, taxonomy, onSuccess, onFailure);
+        }
+
+        public void GetTerms(string taxonomy,
+                            Models.GetTermsFilter filter,
+                            Action<Models.Term[]> onSuccess,
+                            Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            GetTerms(BlogId, _username, _password, taxonomy, filter, onSuccess, onFailure);
+        }
+
+        public void NewTerm(Models.TermContent content,
+                           Action<string> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            NewTerm(BlogId, _username, _password, content, onSuccess, onFailure);
+        }
+
+        public void EditTerm(int termId,
+                           Models.TermContent content,
+                           Action<bool> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            EditTerm(BlogId, _username, _password, termId, content, onSuccess, onFailure);
+        }
+
+        protected void DeleteTerm(string taxonomy,
+                           int termId,
+                           Action<bool> onSuccess,
+                           Action<Models.Fault> onFailure)
+        {
+            if (!IsAuthed) throw new InvalidCredentialException();
+            DeleteTerm(BlogId, _username, _password, taxonomy, termId, onSuccess, onFailure);
+        }
+        #endregion Public Methods
     }
 }

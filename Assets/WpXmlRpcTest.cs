@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using UnityEngine;
 using OpenLevel.Wordpress.XmlRpc;
+using System.Collections;
 
 class WpXmlRpcTest : MonoBehaviour
 {
@@ -12,10 +13,17 @@ class WpXmlRpcTest : MonoBehaviour
     void Start()
     {
         client = gameObject.AddComponent<WpXmlRpcClient>();
-        var content = new OpenLevel.Wordpress.XmlRpc.Request.Content();
-        content.post_title = "published";
-        content.post_status = "published";
-        content.post_type = "published";
-        client.NewPost(0, "openlevel", "open12#$", content);
+        client.Auth("openlevel", "open12#$", () =>
+        {
+            client.GetUsersBlogs(blogs =>
+            {
+                client.GetPost(int.Parse(blogs[0].blogid), 1, post =>
+                {
+                    Debug.Log(post.post_title);
+                }
+                , null);
+            }
+            , null);
+        }, null);
     }
 }
