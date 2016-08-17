@@ -1,6 +1,10 @@
 # UnitySpider
 UnitySpider is a web client library for Unity3d that supports **HTTPS** and **Cookie**. It requires Unity 5.2.0 or higher.
 
+# Wordpress Client
+Work in progress..
+It Supports JSON API & XML-RPC in the future.
+
 # Supported Platforms
 UnitySpider uses the [UnityWebRequest](https://docs.unity3d.com/Manual/UnityWebRequest.html). The UnityWebRequest system supports most Unity platforms.
 
