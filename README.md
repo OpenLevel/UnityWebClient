@@ -1,9 +1,6 @@
-# UnityWebclient
-UnityWebclient is a web client for Unity3d that supports **HTTPS** and **Cookie**. It requires Unity 5.2.0 or higher.
-
-# Wordpress Client
-Wordpress Client is in progress.
-It will support JSON API & XML-RPC in the future.
+# UnityWebClient
+UnityWebClient is a web client for Unity3d that supports **HTTPS** and **Cookie**. It requires Unity 5.2.0 or higher.
+See [Examples](https://github.com/OpenLevel/UnityWebClient/tree/master/Assets/Examples).
 
 # Supported Platforms
 UnitySpider uses the [UnityWebRequest](https://docs.unity3d.com/Manual/UnityWebRequest.html). The UnityWebRequest system supports most Unity platforms.
@@ -20,6 +17,10 @@ Additional platform support will be rolled out in further 5.x releases:
 * PS4, PS Vita, and PS Mobile
 * XBox 360 and XBox One
 * Wii U
+
+# Wordpress Client
+Wordpress Client is in progress.
+It will support JSON API & XML-RPC in the future.
 
 #License
 (The MIT License)
