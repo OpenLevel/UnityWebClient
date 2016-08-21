@@ -2,7 +2,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-
 #if UNITY_5_4_OR_NEWER
 using UnityEngine.Networking;
 #elif UNITY_5_2 || UNITY_5_3
@@ -15,7 +14,7 @@ namespace OpenLevel
 {
     public class UnityWebClient : MonoBehaviour
     {
-        protected CookieContainer _cookies;
+        protected CookieContainer _cookies = new CookieContainer();
 
         public CookieContainer Cookies
         {
@@ -25,35 +24,75 @@ namespace OpenLevel
             }
         }
 
-        protected virtual void Awake()
+        /// <summary>
+        /// Dispose request after each a request handler
+        /// </summary>
+        public bool AutoDisposeRequest
         {
-            _cookies = new CookieContainer();
+            get;
+            set;
         }
 
-        IEnumerator CRequest(UnityWebRequest www, Action<UnityWebRequest> handler)
+        IEnumerator CRequest(UnityWebRequest request, Action<UnityWebRequest> handler)
         {
-            if (_cookies.Contains(www.url))
+            if (_cookies.Contains(request.url))
             {
-                www.SetRequestHeader("cookie", _cookies[www.url].ToString());
+                request.SetRequestHeader("cookie", _cookies[request.url].ToString());
             }
 
-            yield return www.Send();
+            // UnityWebRequest has some redirect problems. prevent auto redirect and do it manually.
+            int redirectLimit = request.redirectLimit;
+            int redirectCount = 0;
+            request.redirectLimit = 0;
 
-            string cookieString = www.GetResponseHeader("set-cookie");
+            while (redirectCount <= redirectLimit)
+            {
+                if (_cookies.Contains(request.url))
+                    request.SetRequestHeader("cookie", _cookies[request.url].ToString());
 
-            if (!String.IsNullOrEmpty(cookieString))
-                _cookies.Set(www.url, www.GetResponseHeader("set-cookie"));
+                yield return request.Send();
+
+                string cookieString = request.GetResponseHeader("set-cookie");
+
+                if (!String.IsNullOrEmpty(cookieString))
+                    _cookies.Set(request.url, cookieString);
+
+                // 301, 302 Redirect
+                if (request.responseCode == 301 ||
+                    request.responseCode == 302)
+                {
+                    var newRequest = new UnityWebRequest(new Uri(request.url).GetComponents(UriComponents.SchemeAndServer, UriFormat.Unescaped)
+                                                    + request.GetResponseHeader("location"),
+                                                    request.method,
+                                                    request.downloadHandler,
+                                                    request.uploadHandler);
+                    // To recycle the handlers
+                    request.disposeDownloadHandlerOnDispose = false;
+                    request.disposeUploadHandlerOnDispose = false;
+                    request.Dispose();
+                    request = newRequest;
+
+                    redirectCount++;
+                }
+                else
+                {
+                    break;
+                }
+            }
 
             if (handler != null)
-                handler(www);
+                handler(request);
+
+            if (AutoDisposeRequest)
+                request.Dispose();
         }
 
         /// <summary>
         /// Sends a given UnityWebReqeust
         /// </summary>
-        public void Request(UnityWebRequest www, Action<UnityWebRequest> handler)
+        public void Request(UnityWebRequest request, Action<UnityWebRequest> handler)
         {
-            StartCoroutine(CRequest(www, handler));
+            StartCoroutine(CRequest(request, handler));
         }
 
         /// <summary>
