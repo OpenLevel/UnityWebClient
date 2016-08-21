@@ -3,18 +3,18 @@ using System.Collections;
 
 namespace OpenLevel
 {
-    public sealed class SingletonWebClient : UnityWebClient
+    public sealed class UnityWebClientSingleton : UnityWebClient
     {
-        static SingletonWebClient _instance;
+        static UnityWebClientSingleton _instance;
         static readonly object _lock = new object();
 
-        public static SingletonWebClient Instance
+        public static UnityWebClientSingleton Instance
         {
             get
             {
                 if (applicationIsQuitting)
                 {
-                    Debug.LogWarning("[Singleton] Instance '" + typeof(SingletonWebClient) +
+                    Debug.LogWarning("[Singleton] Instance '" + typeof(UnityWebClientSingleton) +
                         "' already destroyed on application quit." +
                         " Won't create again - returning null.");
                     return null;
@@ -24,9 +24,9 @@ namespace OpenLevel
                 {
                     if (_instance == null)
                     {
-                        _instance = (SingletonWebClient)FindObjectOfType(typeof(SingletonWebClient));
+                        _instance = (UnityWebClientSingleton)FindObjectOfType(typeof(UnityWebClientSingleton));
 
-                        if (FindObjectsOfType(typeof(SingletonWebClient)).Length > 1)
+                        if (FindObjectsOfType(typeof(UnityWebClientSingleton)).Length > 1)
                         {
                             Debug.LogError("[Singleton] Something went really wrong " +
                                 " - there should never be more than 1 singleton!" +
@@ -37,12 +37,12 @@ namespace OpenLevel
                         if (_instance == null)
                         {
                             GameObject singleton = new GameObject();
-                            _instance = singleton.AddComponent<SingletonWebClient>();
-                            singleton.name = "(singleton) " + typeof(SingletonWebClient).ToString();
+                            _instance = singleton.AddComponent<UnityWebClientSingleton>();
+                            singleton.name = "(singleton) " + typeof(UnityWebClientSingleton).ToString();
 
                             DontDestroyOnLoad(singleton);
 
-                            Debug.Log("[Singleton] An instance of " + typeof(SingletonWebClient) +
+                            Debug.Log("[Singleton] An instance of " + typeof(UnityWebClientSingleton) +
                                 " is needed in the scene, so '" + singleton +
                                 "' was created with DontDestroyOnLoad.");
                         }
@@ -57,7 +57,7 @@ namespace OpenLevel
             }
         }
 
-        SingletonWebClient() { }
+        UnityWebClientSingleton() { }
 
         static bool applicationIsQuitting = false;
         /// <summary>
