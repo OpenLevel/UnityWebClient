@@ -1,5 +1,5 @@
-# UnityWebclient
-UnityWebclient is a web client for Unity3d that supports **HTTPS** and **Cookie**. It requires Unity 5.2.0 or higher.
+# UnityWebClient
+UnityWebClient is a web client for Unity3d that supports **HTTPS** and **Cookie**. It requires Unity 5.2.0 or higher.
 See [Examples](https://github.com/OpenLevel/UnityWebClient/tree/master/Assets/Examples).
 
 # Supported Platforms
