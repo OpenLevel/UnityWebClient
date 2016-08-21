@@ -5,7 +5,7 @@ using System.Text;
 namespace OpenLevel
 {
     // NOTE : RFC says cookie names are case sensitive.
-    // TODO : Supports exipires, http only and secure option.
+    // TODO : Supports path, exipires, http only and secure option.
     /// <summary>
     /// The Cookie class gets and sets properties of cookies.
     /// </summary>
