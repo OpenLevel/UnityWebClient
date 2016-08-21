@@ -18,7 +18,10 @@ namespace OpenLevel
 
         void HandleResponse(UnityWebRequest request)
         {
-            Debug.Log(request.downloadHandler.text);
+            if (request.isError)
+                Debug.LogWarning(request.error);
+            else
+                Debug.Log(request.downloadHandler.text);
         }
     }
 }

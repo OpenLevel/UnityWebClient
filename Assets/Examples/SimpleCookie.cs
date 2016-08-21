@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Networking;
 using System.Collections;
+using System;
 
 namespace OpenLevel
 {
@@ -13,23 +14,25 @@ namespace OpenLevel
         {
             _webClient = gameObject.AddComponent<UnityWebClient>();
             
-            _webClient.Get("http://httpbin.org/cookies/set/testCookie/test", HandleCookie);
+            _webClient.Get("http://httpbin.org/cookies/set/testCookie/test",
+                        (Action<UnityWebRequest>) PrintCookie +
+                        ((UnityWebRequest request) =>
+                        {
+                            if (!request.isError)
+                                _webClient.Get("http://httpbin.org/cookies/set/testCookie/test2", PrintCookie);
+                        })
+                        );
             
         }
         
-        void HandleCookie(UnityWebRequest request)
+        void PrintCookie(UnityWebRequest request)
         {
-            Debug.Log(request.url);
-            Debug.Log(request.downloadHandler.text);
-            Debug.Log(_webClient.Cookies[request.url]);
-            _webClient.Get("http://httpbin.org/cookies/set/testCookie/test2", HandleCookie2);
-        }
-
-        void HandleCookie2(UnityWebRequest request)
-        {
-            Debug.Log(request.url);
-            Debug.Log(request.downloadHandler.text);
-            Debug.Log(_webClient.Cookies[request.url]);
+            if (request.isError)
+                Debug.LogWarning(request.error);
+            else
+            {
+                Debug.Log("Cookie : " + _webClient.Cookies[request.url]);
+            }
         }
     }
 }
