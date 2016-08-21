@@ -3,7 +3,7 @@ UnityWebClient is a web client for Unity3d that supports **HTTPS** and **Cookie*
 See [Examples](https://github.com/OpenLevel/UnityWebClient/tree/master/Assets/Examples).
 
 # Supported Platforms
-UnitySpider uses the [UnityWebRequest](https://docs.unity3d.com/Manual/UnityWebRequest.html). The UnityWebRequest system supports most Unity platforms.
+UnityWebClient uses the [UnityWebRequest](https://docs.unity3d.com/Manual/UnityWebRequest.html). The UnityWebRequest system supports most Unity platforms.
 
 Platforms supported in 5.2:
 * All versions of the Editor & Standalone players
